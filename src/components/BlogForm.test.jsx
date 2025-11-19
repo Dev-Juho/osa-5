@@ -15,8 +15,6 @@ test('calls createBlog with correct data on submit', () => {
   expect(createBlog.mock.calls[0][0]).toEqual({
     title: 'New Title',
     author: 'New Author',
-    url: 'http://new.url'
+    url: 'http://new.url',
   })
 })
-
-

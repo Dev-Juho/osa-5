@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+vite.config.js
+vitest.config.js
+vitest.setup.js
+

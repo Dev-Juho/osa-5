@@ -1,40 +1,25 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import Blog from './Blog'
 
 describe('Blog component', () => {
   const blog = {
+    id: '123',
     title: 'The Test Blog',
     author: 'Test Author',
-    url: 'http://example.com',
-    likes: 7,
   }
 
-  test('renders title and author by default, not url/likes', () => {
-    render(<Blog blog={blog} />)
-    expect(screen.getByText(/The Test Blog/)).toBeInTheDocument()
-    expect(screen.getByText(/Test Author/)).toBeInTheDocument()
-    expect(screen.queryByText(/http:\/\/example.com/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/likes\s*7/)).not.toBeInTheDocument()
+  const renderWithRouter = component => render(<MemoryRouter>{component}</MemoryRouter>)
+
+  test('renders title and author as link', () => {
+    renderWithRouter(<Blog blog={blog} />)
+    const link = screen.getByRole('link', { name: /The Test Blog Test Author/ })
+    expect(link).toBeInTheDocument()
   })
 
-  test('shows url, likes and user after clicking view', () => {
-    const withUser = { ...blog, user: { name: 'Matti Luukkainen' } }
-    render(<Blog blog={withUser} />)
-    fireEvent.click(screen.getByText('view'))
-    expect(screen.getByText('http://example.com')).toBeInTheDocument()
-    expect(screen.getByText(/likes\s*7/)).toBeInTheDocument()
-    expect(screen.getByText('Matti Luukkainen')).toBeInTheDocument()
-  })
-
-  test('calls onLike twice when like button clicked twice', () => {
-    const onLike = vi.fn()
-    render(<Blog blog={blog} onLike={onLike} />)
-    fireEvent.click(screen.getByText('view'))
-    const likeBtn = screen.getByText('like')
-    fireEvent.click(likeBtn)
-    fireEvent.click(likeBtn)
-    expect(onLike).toHaveBeenCalledTimes(2)
+  test('link points to blog detail route', () => {
+    renderWithRouter(<Blog blog={blog} />)
+    const link = screen.getByRole('link', { name: /The Test Blog Test Author/ })
+    expect(link).toHaveAttribute('href', '/blogs/123')
   })
 })
-
-

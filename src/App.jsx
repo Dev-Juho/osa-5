@@ -1,112 +1,186 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Route, Routes } from 'react-router-dom'
 import Blog from './components/Blog'
 import BlogForm from './components/BlogForm'
+import UsersView from './components/UsersView'
+import UserView from './components/UserView'
+import BlogView from './components/BlogView'
+import Navigation from './components/Navigation'
 import blogService from './services/blogs'
-import axios from 'axios'
+import usersService from './services/users'
+import { addBlog, initializeBlogs } from './reducers/blogsSlice'
+import { loginUser, logoutUser, setUser } from './reducers/userSlice'
+import { showNotification } from './reducers/notificationSlice'
 
 const App = () => {
-  const [blogs, setBlogs] = useState([])
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [user, setUser] = useState(null)
   const [showForm, setShowForm] = useState(false)
-  const [error, setError] = useState(null)
+  const [newName, setNewName] = useState('')
+  const [newUsername, setNewUsername] = useState('')
+
+  const dispatch = useDispatch()
+  const blogs = useSelector(state => state.blogs)
+  const user = useSelector(state => state.user)
+  const notification = useSelector(state => state.notification)
 
   useEffect(() => {
-    blogService.getAll().then(blogs =>
-      setBlogs( blogs )
-    )  
-  }, [])
+    dispatch(initializeBlogs())
+  }, [dispatch])
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+  useEffect(() => {
+    if (user?.token) {
+      blogService.setToken(user.token)
+    }
+  }, [user])
+
+  const handleLogin = async event => {
+    event.preventDefault()
     try {
-      const res = await axios.post('http://localhost:3003/api/login', { username, password })
-      setUser({ name: res.data.name, username: res.data.username })
-      blogService.setToken(res.data.token)
+      await dispatch(loginUser({ username, password }))
       setUsername('')
       setPassword('')
-      setError(null)
-    } catch (err) {
-      setError('wrong username or password')
+    } catch {
     }
   }
 
   const handleLogout = () => {
-    setUser(null)
-    blogService.setToken(null)
+    dispatch(logoutUser())
   }
 
-  const createBlog = async (newBlog) => {
-    const created = await blogService.create(newBlog)
-    setBlogs(blogs.concat(created))
-    setShowForm(false)
-  }
-
-  const likeBlog = async (blog) => {
-    const updated = await blogService.updateLikes(blog.id, (blog.likes || 0) + 1)
-    setBlogs(blogs.map(b => b.id === blog.id ? updated : b))
-  }
-
-  const deleteBlog = async (blog) => {
-    if (window.confirm(`Remove blog ${blog.title} by ${blog.author}?`)) {
-      await blogService.remove(blog.id)
-      setBlogs(blogs.filter(b => b.id !== blog.id))
+  const handleRegister = async event => {
+    event.preventDefault()
+    try {
+      await usersService.create({
+        name: newName,
+        username: newUsername,
+        password: 'sekret',
+      })
+      setNewName('')
+      setNewUsername('')
+      dispatch(showNotification(`created user ${newUsername}`))
+    } catch (error) {
+      const message = error.response?.data?.error || 'failed to create user'
+      dispatch(showNotification(message))
     }
+  }
+
+  const createBlog = async newBlog => {
+    try {
+      await dispatch(addBlog(newBlog))
+      setShowForm(false)
+    } catch {
+      dispatch(showNotification('failed to create blog'))
+    }
+  }
+
+  const handleDemoLogin = () => {
+    const demoUser = { name: 'Demo User', username: 'demo', token: null }
+    dispatch(setUser(demoUser))
+    blogService.setToken(null)
+    dispatch(showNotification('signed in as demo user'))
   }
 
   const sortedBlogs = [...blogs].sort((a, b) => (b.likes || 0) - (a.likes || 0))
 
+  const blogsView = (
+    <div className="blogs-section">
+      <div style={{ marginBottom: '1rem' }}>
+        {!showForm && (
+          <button className="ghost-button" onClick={() => setShowForm(true)}>
+            new blog
+          </button>
+        )}
+        {showForm && (
+          <div>
+            <BlogForm createBlog={createBlog} />
+          </div>
+        )}
+      </div>
+
+      <div className="blogs-list">
+        {sortedBlogs.map(blog => (
+          <div className="blog-item" key={blog.id}>
+            <Blog blog={blog} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   return (
-    <div>
-      <h2>blogs</h2>
-      {error && <div>{error}</div>}
-      {!user && (
-        <div>
-          <h3>log in to application</h3>
-          <form onSubmit={handleLogin}>
-            <div>
-              <label htmlFor="username">username</label>
-              <input id="username" value={username} onChange={({ target }) => setUsername(target.value)} />
-            </div>
-            <div>
-              <label htmlFor="password">password</label>
-              <input id="password" type="password" value={password} onChange={({ target }) => setPassword(target.value)} />
-            </div>
-            <button type="submit">login</button>
-          </form>
-        </div>
-      )}
+    <div className="app-shell">
+      <div className="app-card">
+        <h2 className="app-title">blog app</h2>
+        {notification && <div className="notification">{notification}</div>}
 
-      {user && (
-        <div>
-          <div>
-            {user.name} logged in
-            <button onClick={handleLogout}>logout</button>
-          </div>
+        {!user && (
+          <div className="login-card">
+            <h3>log in to application</h3>
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+              <form onSubmit={handleLogin}>
+                <div className="form-group">
+                  <label htmlFor="username">username</label>
+                  <input
+                    id="username"
+                    value={username}
+                    onChange={({ target }) => setUsername(target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="password">password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={({ target }) => setPassword(target.value)}
+                  />
+                </div>
+                <button type="submit">login</button>
+              </form>
 
-          <div>
-            {!showForm && <button onClick={() => setShowForm(true)}>new blog</button>}
-            {showForm && (
               <div>
-                <BlogForm createBlog={createBlog} />
+                <h4 style={{ marginBottom: '0.5rem' }}>Need an account?</h4>
+                <form onSubmit={handleRegister}>
+                  <div className="form-group">
+                    <label htmlFor="name">name</label>
+                    <input id="name" value={newName} onChange={({ target }) => setNewName(target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="new-username">username</label>
+                    <input
+                      id="new-username"
+                      value={newUsername}
+                      onChange={({ target }) => setNewUsername(target.value)}
+                    />
+                  </div>
+                  <button type="submit">create account (pwd: sekret)</button>
+                </form>
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                  <p style={{ margin: '0.5rem 0' }}>or</p>
+                  <button type="button" className="ghost-button" onClick={handleDemoLogin}>
+                    continue as demo user
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
           </div>
+        )}
 
+        {user && (
           <div>
-            {sortedBlogs.map(blog => (
-              <div className="blog" key={blog.id}>
-                <Blog
-                  blog={blog}
-                  onLike={likeBlog}
-                  onRemove={(blog.user === user.username || blog.user?.username === user.username) ? deleteBlog : undefined}
-                />
-              </div>
-            ))}
+            <Navigation user={user} onLogout={handleLogout} />
+
+            <Routes>
+              <Route path="/" element={blogsView} />
+              <Route path="/blogs/:id" element={<BlogView />} />
+              <Route path="/users" element={<UsersView />} />
+              <Route path="/users/:id" element={<UserView />} />
+            </Routes>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
